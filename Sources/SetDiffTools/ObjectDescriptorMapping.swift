@@ -20,28 +20,21 @@ public struct ObjectDescriptorMapping<Identifier: Equatable & Hashable, ObjectDe
 
     public mutating func update(_ descriptors: [ObjectDescriptor]) {
         var objects = self.objects
-        let descriptorsById = Dictionary(uniqueKeysWithValues: descriptors.map { ($0.id as! Identifier, $0) })
 
-        // add and remove entities as needed
-        difference(from: Set(objects.keys), to: Set(descriptorsById.keys)).forEach { e in
-            switch e.modification {
-            case .add:
-                let descriptor = descriptorsById[e.value]!
-                objects[descriptor.id as! Identifier] = handleAdd(descriptor)
-
-            case .remove:
-                let object = objects.removeValue(forKey: e.value)!
-                handleRemove(object)
-
-            case .keep:
-                break
-            }
+        // remove objects that are not represented in descriptors anymore
+        for id in Set(objects.keys).subtracting(Set(descriptors.map { $0.id as! Identifier })) {
+            handleRemove(objects.removeValue(forKey: id)!)
         }
 
-        // update attributes of updated and kept entities
-        objects.forEach { id, object in
-            let descriptor = descriptorsById[id]!
-            handleUpdate(descriptor, object)
+        // add+update newly added objects
+        // update existing objects
+        for descriptor in descriptors {
+            var object = objects[descriptor.id as! Identifier]
+            if object == nil {
+                object = handleAdd(descriptor)
+                objects[descriptor.id as! Identifier] = object
+            }
+            handleUpdate(descriptor, object!)
         }
 
         self.objects = objects
